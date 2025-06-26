@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>残業申請アプリ</title>
+    <!-- ファビコンの追加 -->
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⏰</text></svg>" />
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Interフォントを適用 */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f0f4f8; /* 背景色を少し柔らかく */
+        }
+    </style>
+</head>
+<body class="flex items-center justify-center min-h-screen p-4">
+    <div class="bg-white p-8 rounded-2xl shadow-xl max-w-lg w-full transform transition-all duration-300 hover:shadow-2xl">
+        <h1 class="text-3xl font-bold text-gray-800 mb-6 text-center">残業申請アプリ</h1>
+
+        <!-- 入力フォーム -->
+        <div class="mb-5">
+            <label for="overtimeReason" class="block text-gray-700 text-sm font-semibold mb-2">
+                残業理由
+            </label>
+            <input
+                type="text"
+                id="overtimeReason"
+                class="shadow appearance-none border rounded-xl w-full py-3 px-4 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent transition-all duration-200"
+                placeholder="例: 資料作成のため"
+                aria-label="残業理由"
+            >
+        </div>
+
+        <div class="mb-6">
+            <label for="workEndTime" class="block text-gray-700 text-sm font-semibold mb-2">
+                作業終了時刻
+            </label>
+            <input
+                type="time"
+                id="workEndTime"
+                class="shadow appearance-none border rounded-xl w-full py-3 px-4 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent transition-all duration-200"
+                aria-label="作業終了時刻"
+            >
+        </div>
+
+        <!-- 累計残業時間の表示 -->
+        <div class="mb-6 bg-blue-50 p-4 rounded-xl text-blue-800 text-sm font-medium text-center">
+            今月の累計残業時間: <span id="accumulatedOvertimeDisplay" class="font-bold text-lg">0時間0分</span>
+        </div>
+
+        <!-- 累計残業時間の手動修正 -->
+        <div class="mb-6 p-4 rounded-xl border border-gray-200 bg-gray-50">
+            <label for="manualOvertimeAdjustment" class="block text-gray-700 text-sm font-semibold mb-2">
+                累計残業時間の手動修正
+            </label>
+            <div class="flex gap-2">
+                <input
+                    type="text"
+                    id="manualOvertimeAdjustment"
+                    class="shadow appearance-none border rounded-xl w-full py-3 px-4 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-gray-400 focus:border-transparent transition-all duration-200"
+                    placeholder="例: 5時間30分 または 330 (分)"
+                    aria-label="累計残業時間の手動修正"
+                >
+                <button
+                    id="adjustOvertimeButton"
+                    class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-xl focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-opacity-75 transition-all duration-200 shadow-md hover:shadow-lg text-sm whitespace-nowrap"
+                    aria-label="累計時間を修正"
+                >
+                    修正
+                </button>
+            </div>
+            <p class="text-xs text-gray-500 mt-2">「5時間30分」または「330（分）」のように入力してください。</p>
+        </div>
+
+        <!-- コピーボタン -->
+        <button
+            id="copyButton"
+            class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-75 transition-all duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
+            aria-label="申請文をコピー"
+        >
+            申請文をクリップボードにコピー
+        </button>
+
+        <!-- メッセージボックス -->
+        <div id="messageBox" class="mt-4 text-center text-sm font-medium text-green-700 hidden rounded-md p-2 bg-green-100">
+            <!-- メッセージが表示されます -->
+        </div>
+    </div>
+
+    <script>
+        // DOM要素の取得
+        const overtimeReasonInput = document.getElementById('overtimeReason');
+        const workEndTimeInput = document.getElementById('workEndTime');
+        const accumulatedOvertimeDisplay = document.getElementById('accumulatedOvertimeDisplay');
+        const copyButton = document.getElementById('copyButton');
+        const messageBox = document.getElementById('messageBox');
+        const manualOvertimeAdjustmentInput = document.getElementById('manualOvertimeAdjustment'); // 新しい入力フィールド
+        const adjustOvertimeButton = document.getElementById('adjustOvertimeButton'); // 新しいボタン
+
+        // 定数定義
+        const STANDARD_END_TIME_MINUTES = 18 * 60 + 30; // 18:30 を分に変換 (1110分)
+        const LOCAL_STORAGE_KEY_DAILY_RECORDS = 'overtimeAppDailyRecords';
+        const LOCAL_STORAGE_KEY_ACCUMULATED_OVERTIME = 'overtimeAppAccumulatedOvertime';
+        const LOCAL_STORAGE_KEY_LAST_MONTH = 'overtimeAppLastMonth';
+
+        // 初期化処理
+        window.onload = function() {
+            initializeApp();
+        };
+
+        /**
+         * アプリケーションの初期化
+         * 1. 今日の日付を取得
+         * 2. 月が変わったかチェックし、累計残業時間をリセット
+         * 3. 累計残業時間を表示
+         * 4. 過去の入力があれば、UIに表示
+         */
+        function initializeApp() {
+            const today = new Date();
+            const currentMonthYYMM = formatDateToYYMM(today);
+
+            let accumulatedOvertimeMinutes = loadFromLocalStorage(LOCAL_STORAGE_KEY_ACCUMULATED_OVERTIME, 0);
+            let lastRecordedMonth = loadFromLocalStorage(LOCAL_STORAGE_KEY_LAST_MONTH, '');
+
+            // 月が変わった場合、累計残業時間をリセット
+            if (currentMonthYYMM !== lastRecordedMonth) {
+                accumulatedOvertimeMinutes = 0;
+                saveToLocalStorage(LOCAL_STORAGE_KEY_ACCUMULATED_OVERTIME, accumulatedOvertimeMinutes);
+                saveToLocalStorage(LOCAL_STORAGE_KEY_LAST_MONTH, currentMonthYYMM);
+                // 月が変わったので、日次記録もクリアしても良いが、今回は累計のみリセット
+                localStorage.removeItem(LOCAL_STORAGE_KEY_DAILY_RECORDS); // 月替わりで日次記録もクリア
+            }
+
+            displayAccumulatedOvertime(accumulatedOvertimeMinutes);
+
+            // 今日のデータがあれば、入力フォームにセット
+            const dailyRecords = loadFromLocalStorage(LOCAL_STORAGE_KEY_DAILY_RECORDS, {});
+            const todayYYMMDD = formatDateToYYMMDD(today);
+            if (dailyRecords[todayYYMMDD]) {
+                overtimeReasonInput.value = dailyRecords[todayYYMMDD].overtimeReason || '';
+                workEndTimeInput.value = dailyRecords[todayYYMMDD].workEndTime || '';
+            }
+        }
+
+        /**
+         * 日付をYYMMDD形式でフォーマット
+         * @param {Date} date - 日付オブジェクト
+         * @returns {string} YYMMDD形式の文字列
+         */
+        function formatDateToYYMMDD(date) {
+            const year = String(date.getFullYear()).slice(-2);
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            return `${year}${month}${day}`;
+        }
+
+        /**
+         * 日付をYYMM形式でフォーマット
+         * @param {Date} date - 日付オブジェクト
+         * @returns {string} YYMM形式の文字列
+         */
+        function formatDateToYYMM(date) {
+            const year = String(date.getFullYear()).slice(-2);
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            return `${year}${month}`;
+        }
+
+        /**
+         * 時刻文字列（HH:MM）を分に変換
+         * @param {string} timeStr - 時刻文字列（例: "19:45"）
+         * @returns {number} 0時0分からの総分数
+         */
+        function timeToMinutes(timeStr) {
+            if (!timeStr) return 0;
+            const [hours, minutes] = timeStr.split(':').map(Number);
+            return hours * 60 + minutes;
+        }
+
+        /**
+         * 分数をH時間M分の形式でフォーマット
+         * @param {number} totalMinutes - 総分数
+         * @returns {string} "H時間M分"形式の文字列
+         */
+        function formatMinutesToHM(totalMinutes) {
+            if (totalMinutes < 0) totalMinutes = 0; // 残業時間がマイナスの場合は0とする
+            const hours = Math.floor(totalMinutes / 60);
+            const minutes = totalMinutes % 60;
+            return `${hours}時間${minutes}分`;
+        }
+
+        /**
+         * 累計残業時間を表示する
+         * @param {number} minutes - 累計残業分数
+         */
+        function displayAccumulatedOvertime(minutes) {
+            accumulatedOvertimeDisplay.textContent = formatMinutesToHM(minutes);
+        }
+
+        /**
+         * LocalStorageからデータをロード
+         * @param {string} key - ストレージキー
+         * @param {*} defaultValue - データがない場合のデフォルト値
+         * @returns {*} ロードされたデータ
+         */
+        function loadFromLocalStorage(key, defaultValue) {
+            try {
+                const data = localStorage.getItem(key);
+                return data ? JSON.parse(data) : defaultValue;
+            } catch (e) {
+                console.error('Error loading from localStorage', e);
+                return defaultValue;
+            }
+        }
+
+        /**
+         * LocalStorageにデータを保存
+         * @param {string} key - ストレージキー
+         * @param {*} data - 保存するデータ
+         */
+        function saveToLocalStorage(key, data) {
+            try {
+                localStorage.setItem(key, JSON.stringify(data));
+            } catch (e) {
+                console.error('Error saving to localStorage', e);
+            }
+        }
+
+        /**
+         * メッセージボックスを表示/非表示する
+         * @param {string} message - 表示するメッセージ
+         * @param {string} type - 'success' または 'error'
+         */
+        function showMessageBox(message, type) {
+            messageBox.textContent = message;
+            messageBox.classList.remove('hidden', 'bg-green-100', 'text-green-700', 'bg-red-100', 'text-red-700', 'bg-blue-100', 'text-blue-700');
+            if (type === 'success') {
+                messageBox.classList.add('bg-green-100', 'text-green-700');
+            } else if (type === 'error') {
+                messageBox.classList.add('bg-red-100', 'text-red-700');
+            } else if (type === 'info') {
+                messageBox.classList.add('bg-blue-100', 'text-blue-700');
+            }
+            setTimeout(() => {
+                messageBox.classList.add('hidden');
+            }, 3000); // 3秒後に非表示
+        }
+
+        /**
+         * "H時間M分" または "総分数" 形式の文字列を総分数に変換
+         * @param {string} inputStr - 入力文字列（例: "5時間30分" または "330"）
+         * @returns {number | null} 変換された総分数、または無効な場合はnull
+         */
+        function parseInputToMinutes(inputStr) {
+            inputStr = inputStr.trim();
+            if (!inputStr) return null;
+
+            // "H時間M分" 形式を試す
+            const hmMatch = inputStr.match(/(\d+)時間(\d+)分/);
+            if (hmMatch) {
+                const hours = parseInt(hmMatch[1]);
+                const minutes = parseInt(hmMatch[2]);
+                return hours * 60 + minutes;
+            }
+
+            // "H時間" 形式を試す
+            const hMatch = inputStr.match(/(\d+)時間/);
+            if (hMatch) {
+                const hours = parseInt(hMatch[1]);
+                return hours * 60;
+            }
+
+            // "M分" 形式を試す
+            const mMatch = inputStr.match(/(\d+)分/);
+            if (mMatch) {
+                const minutes = parseInt(mMatch[1]);
+                return minutes;
+            }
+
+            // 数字のみ（総分数）を試す
+            if (/^\d+$/.test(inputStr)) {
+                return parseInt(inputStr);
+            }
+
+            return null; // どの形式にも一致しない場合
+        }
+
+        /**
+         * 累計残業時間修正ボタンクリック時の処理
+         */
+        adjustOvertimeButton.addEventListener('click', () => {
+            const manualInput = manualOvertimeAdjustmentInput.value;
+            const newAccumulatedMinutes = parseInputToMinutes(manualInput);
+
+            if (newAccumulatedMinutes === null || isNaN(newAccumulatedMinutes) || newAccumulatedMinutes < 0) {
+                showMessageBox('無効な入力です。「5時間30分」または「330（分）」のように入力してください。', 'error');
+                return;
+            }
+
+            // 累計残業時間を手動で更新
+            saveToLocalStorage(LOCAL_STORAGE_KEY_ACCUMULATED_OVERTIME, newAccumulatedMinutes);
+
+            // 手動調整が行われた場合、現在の月の日次記録をクリアし、
+            // 今日の日付を最終記録月として設定し直すことで、
+            // 以降の計算がこの新しい累計時間から始まるようにする。
+            const today = new Date();
+            const currentMonthYYMM = formatDateToYYMM(today);
+            localStorage.removeItem(LOCAL_STORAGE_KEY_DAILY_RECORDS); // 日次記録をクリア
+            saveToLocalStorage(LOCAL_STORAGE_KEY_LAST_MONTH, currentMonthYYMM); // 現在の月を最終記録月として設定
+
+            displayAccumulatedOvertime(newAccumulatedMinutes);
+            showMessageBox('累計残業時間を修正しました。', 'success');
+        });
+
+        /**
+         * コピーボタンクリック時の処理
+         */
+        copyButton.addEventListener('click', () => {
+            const overtimeReason = overtimeReasonInput.value.trim(); // 残業理由
+            const workEndTime = workEndTimeInput.value; // 作業終了時刻
+
+            if (!overtimeReason || !workEndTime) {
+                showMessageBox('残業理由と作業終了時刻を入力してください。', 'error');
+                return;
+            }
+
+            const today = new Date();
+            const todayYYMMDD = formatDateToYYMMDD(today); // 今日の日付
+            const currentMonthYYMM = formatDateToYYMM(today);
+
+            // 今日の残業時間(C) の計算
+            const workEndTimeMinutes = timeToMinutes(workEndTime);
+            let dailyOvertimeMinutes = workEndTimeMinutes - STANDARD_END_TIME_MINUTES;
+            if (dailyOvertimeMinutes < 0) {
+                dailyOvertimeMinutes = 0; // 18:30より前に終わった場合は残業時間0
+            }
+
+            // データベース（LocalStorage）の更新
+            let dailyRecords = loadFromLocalStorage(LOCAL_STORAGE_KEY_DAILY_RECORDS, {});
+            let accumulatedOvertimeMinutes = loadFromLocalStorage(LOCAL_STORAGE_KEY_ACCUMULATED_OVERTIME, 0);
+            let lastRecordedMonth = loadFromLocalStorage(LOCAL_STORAGE_KEY_LAST_MONTH, '');
+
+            // 月が変わった場合の累計リセット処理を再チェック（コピー時にも確認）
+            // initializeApp() で既に処理されているはずだが、念のためここでも確認
+            if (currentMonthYYMM !== lastRecordedMonth) {
+                accumulatedOvertimeMinutes = 0; // 累計をリセット
+                saveToLocalStorage(LOCAL_STORAGE_KEY_LAST_MONTH, currentMonthYYMM);
+                localStorage.removeItem(LOCAL_STORAGE_KEY_DAILY_RECORDS); // 日次記録もクリア
+                dailyRecords = {}; // dailyRecordsもリセット
+            }
+
+            // 今日の残業時間が既に記録されているかチェックし、累計からその分を引いてから更新
+            // 手動調整が行われた場合は dailyRecords がクリアされているため、previousDailyOvertime は 0 になる
+            const previousDailyOvertime = dailyRecords[todayYYMMDD] ? dailyRecords[todayYYMMDD].dailyOvertimeMinutes : 0;
+            accumulatedOvertimeMinutes = accumulatedOvertimeMinutes - previousDailyOvertime + dailyOvertimeMinutes;
+
+            // 日次記録を更新または追加
+            dailyRecords[todayYYMMDD] = {
+                date: todayYYMMDD,
+                workEndTime: workEndTime,
+                overtimeReason: overtimeReason,
+                dailyOvertimeMinutes: dailyOvertimeMinutes
+            };
+
+            // 累計残業時間（変数D）を更新
+            saveToLocalStorage(LOCAL_STORAGE_KEY_ACCUMULATED_OVERTIME, accumulatedOvertimeMinutes);
+            saveToLocalStorage(LOCAL_STORAGE_KEY_DAILY_RECORDS, dailyRecords);
+
+            // UIの累計残業時間を更新
+            displayAccumulatedOvertime(accumulatedOvertimeMinutes);
+
+            // コピーする文章の作成 (新しいフォーマット)
+            const accumulatedOvertimeFormatted = formatMinutesToHM(accumulatedOvertimeMinutes); // 累計残業時間
+            const textToCopy = `
+おつかれ様です。
+本日下記の通り残業申請いたします。
+①作業内容：${overtimeReason}
+②作業終了予定：${workEndTime}
+③累計：${accumulatedOvertimeFormatted}
+よろしくお願いいたします。
+            `.trim(); // 不要な改行を削除
+
+            // クリップボードにコピー
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(textToCopy)
+                    .then(() => {
+                        showMessageBox('申請文がクリップボードにコピーされました！', 'success');
+                    })
+                    .catch(err => {
+                        console.error('クリップボードへのコピーに失敗しました:', err);
+                        showMessageBox('クリップボードへのコピーに失敗しました。手動でコピーしてください。', 'error');
+                    });
+            } else {
+                // `document.execCommand('copy')` を使用するフォールバック
+                const textArea = document.createElement("textarea");
+                textArea.value = textToCopy;
+                textArea.style.position = "fixed"; // 画面外に配置
+                textArea.style.left = "-9999px";
+                textArea.style.top = "-9999px";
+                document.body.appendChild(textArea);
+                textArea.focus();
+                textArea.select();
+                try {
+                    const successful = document.execCommand('copy');
+                    if (successful) {
+                        showMessageBox('申請文がクリップボードにコピーされました！', 'success');
+                    } else {
+                        throw new Error('execCommand fallback failed');
+                    }
+                } catch (err) {
+                        console.error('クリップボードへのコピーに失敗しました:', err);
+                        showMessageBox('クリップボードへのコピーに失敗しました。手動でコピーしてください。', 'error');
+                } finally {
+                    document.body.removeChild(textArea);
+                }
+            }
+        });
+    </script>
+</body>
+</html>
