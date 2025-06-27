@@ -32,26 +32,26 @@
     </style>
 </head>
 <body class="flex items-center justify-center min-h-screen p-4">
-    <!-- アプリ全体の高さを制限 -->
-    <div class="bg-white p-8 rounded-2xl shadow-xl max-w-lg w-full max-h-[1200px] overflow-y-auto transform transition-all duration-300 hover:shadow-2xl">
-        <h1 class="text-3xl font-bold text-gray-800 mb-6 text-center">残業申請アプリ</h1>
+    <!-- アプリ全体の高さを制限していたmax-h-[1300px]を削除し、overflow-y-autoも削除 -->
+    <div class="bg-white p-6 rounded-2xl shadow-xl max-w-lg w-full transform transition-all duration-300 hover:shadow-2xl">
+        <h1 class="text-2xl font-bold text-gray-800 mb-4 text-center">残業申請アプリ</h1>
 
         <!-- 入力フォーム -->
-        <div class="mb-5">
-            <label for="overtimeReason" class="block text-gray-700 text-sm font-semibold mb-2">
+        <div class="mb-4">
+            <label for="overtimeReason" class="block text-gray-700 text-sm font-semibold mb-1">
                 残業理由
             </label>
             <input
                 type="text"
                 id="overtimeReason"
-                class="shadow appearance-none border rounded-xl w-full py-3 px-4 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent transition-all duration-200"
+                class="shadow appearance-none border rounded-xl w-full py-2.5 px-4 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent transition-all duration-200"
                 placeholder="例: 資料作成のため"
                 aria-label="残業理由"
             >
         </div>
 
-        <div class="mb-6">
-            <label for="workEndTime" class="block text-gray-700 text-sm font-semibold mb-2">
+        <div class="mb-4">
+            <label for="workEndTime" class="block text-gray-700 text-sm font-semibold mb-1">
                 作業終了時刻
             </label>
             <input
@@ -59,20 +59,20 @@
                 id="workEndTime"
                 value="19:30"
                 step="900"
-                class="shadow appearance-none border rounded-xl w-full py-3 px-4 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent transition-all duration-200"
+                class="shadow appearance-none border rounded-xl w-full py-2.5 px-4 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent transition-all duration-200"
                 aria-label="作業終了時刻"
             >
         </div>
 
         <!-- 累計残業時間の表示 -->
-        <div class="mb-6 bg-blue-50 p-4 rounded-xl text-blue-800 text-sm font-medium text-center">
+        <div class="mb-4 bg-blue-50 p-3 rounded-xl text-blue-800 text-sm font-medium text-center">
             今月の累計残業時間: <span id="accumulatedOvertimeDisplay" class="font-bold text-lg">0時間0分</span>
         </div>
 
         <!-- 累計残業時間の手動修正プルダウントグルボタン -->
         <button
             id="toggleManualAdjustmentButton"
-            class="w-full bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-2 px-4 rounded-xl focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-opacity-75 transition-all duration-200 shadow-sm hover:shadow-md mb-4 flex items-center justify-between"
+            class="w-full bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-2 px-4 rounded-xl focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-opacity-75 transition-all duration-200 shadow-sm hover:shadow-md mb-3 flex items-center justify-between"
             aria-expanded="false"
             aria-controls="manualAdjustmentSection"
         >
@@ -81,15 +81,15 @@
         </button>
 
         <!-- 累計残業時間の手動修正セクション (プルダウン) -->
-        <div id="manualAdjustmentSection" class="collapsible-section mb-6 p-4 rounded-xl border border-gray-200 bg-gray-50">
-            <label for="manualOvertimeAdjustment" class="block text-gray-700 text-sm font-semibold mb-2">
+        <div id="manualAdjustmentSection" class="collapsible-section mb-0 p-3 rounded-xl border border-gray-200 bg-gray-50">
+            <label for="manualOvertimeAdjustment" class="block text-gray-700 text-sm font-semibold mb-1">
                 新しい累計残業時間
             </label>
             <div class="flex gap-2">
                 <input
                     type="text"
                     id="manualOvertimeAdjustment"
-                    class="shadow appearance-none border rounded-xl w-full py-3 px-4 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-gray-400 focus:border-transparent transition-all duration-200"
+                    class="shadow appearance-none border rounded-xl w-full py-2.5 px-4 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-gray-400 focus:border-transparent transition-all duration-200"
                     placeholder="例: 5時間30分 または 330 (分)"
                     aria-label="累計残業時間の手動修正"
                 >
@@ -107,14 +107,14 @@
         <!-- コピーボタン -->
         <button
             id="copyButton"
-            class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-75 transition-all duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
+            class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 px-4 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-75 transition-all duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 mt-3"
             aria-label="申請文をコピー"
         >
             申請文をクリップボードにコピー
         </button>
 
         <!-- メッセージボックス -->
-        <div id="messageBox" class="mt-4 text-center text-sm font-medium text-green-700 hidden rounded-md p-2 bg-green-100">
+        <div id="messageBox" class="mt-3 text-center text-sm font-medium text-green-700 hidden rounded-md p-2 bg-green-100">
             <!-- メッセージが表示されます -->
         </div>
     </div>
