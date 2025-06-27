@@ -9,8 +9,6 @@
     <!-- iOS Safari ホーム画面アイコン (Apple Touch Icon) -->
     <!-- icon.pngファイルを直接参照します。このファイルはindex.htmlと同じディレクトリに配置してください。 -->
     <link rel="apple-touch-icon" href="icon.png">
-    <!-- 必要であれば、サイズ指定のバリエーションも追加できます -->
-    <!-- <link rel="apple-touch-icon" sizes="180x180" href="icon-180x180.png"> -->
 
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -20,10 +18,22 @@
             font-family: 'Inter', sans-serif;
             background-color: #f0f4f8; /* 背景色を少し柔らかく */
         }
+        /* プルダウンセクションの開閉アニメーション */
+        .collapsible-section {
+            transition: max-height 0.3s ease-out, opacity 0.3s ease-out;
+            overflow: hidden;
+            max-height: 0;
+            opacity: 0;
+        }
+        .collapsible-section.open {
+            max-height: 200px; /* 十分な高さを設定 (コンテンツに合わせて調整) */
+            opacity: 1;
+        }
     </style>
 </head>
 <body class="flex items-center justify-center min-h-screen p-4">
-    <div class="bg-white p-8 rounded-2xl shadow-xl max-w-lg w-full transform transition-all duration-300 hover:shadow-2xl">
+    <!-- アプリ全体の高さを制限 -->
+    <div class="bg-white p-8 rounded-2xl shadow-xl max-w-lg w-full max-h-[1300px] overflow-y-auto transform transition-all duration-300 hover:shadow-2xl">
         <h1 class="text-3xl font-bold text-gray-800 mb-6 text-center">残業申請アプリ</h1>
 
         <!-- 入力フォーム -->
@@ -47,6 +57,8 @@
             <input
                 type="time"
                 id="workEndTime"
+                value="19:30"
+                step="900"
                 class="shadow appearance-none border rounded-xl w-full py-3 px-4 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent transition-all duration-200"
                 aria-label="作業終了時刻"
             >
@@ -57,10 +69,21 @@
             今月の累計残業時間: <span id="accumulatedOvertimeDisplay" class="font-bold text-lg">0時間0分</span>
         </div>
 
-        <!-- 累計残業時間の手動修正 -->
-        <div class="mb-6 p-4 rounded-xl border border-gray-200 bg-gray-50">
+        <!-- 累計残業時間の手動修正プルダウントグルボタン -->
+        <button
+            id="toggleManualAdjustmentButton"
+            class="w-full bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-2 px-4 rounded-xl focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-opacity-75 transition-all duration-200 shadow-sm hover:shadow-md mb-4 flex items-center justify-between"
+            aria-expanded="false"
+            aria-controls="manualAdjustmentSection"
+        >
+            <span>累計残業時間の手動修正</span>
+            <span id="toggleArrow" class="transform transition-transform duration-200">▼</span>
+        </button>
+
+        <!-- 累計残業時間の手動修正セクション (プルダウン) -->
+        <div id="manualAdjustmentSection" class="collapsible-section mb-6 p-4 rounded-xl border border-gray-200 bg-gray-50">
             <label for="manualOvertimeAdjustment" class="block text-gray-700 text-sm font-semibold mb-2">
-                累計残業時間の手動修正
+                新しい累計残業時間
             </label>
             <div class="flex gap-2">
                 <input
@@ -72,7 +95,7 @@
                 >
                 <button
                     id="adjustOvertimeButton"
-                    class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-xl focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-opacity-75 transition-all duration-200 shadow-md hover:shadow-lg text-sm whitespace-nowrap"
+                    class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-xl focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-opacity-75 transition-all duration-200 shadow-md hover:shadow-lg text-sm whitespace-nowrap flex-shrink-0"
                     aria-label="累計時間を修正"
                 >
                     修正
@@ -103,8 +126,11 @@
         const accumulatedOvertimeDisplay = document.getElementById('accumulatedOvertimeDisplay');
         const copyButton = document.getElementById('copyButton');
         const messageBox = document.getElementById('messageBox');
-        const manualOvertimeAdjustmentInput = document.getElementById('manualOvertimeAdjustment'); // 新しい入力フィールド
-        const adjustOvertimeButton = document.getElementById('adjustOvertimeButton'); // 新しいボタン
+        const manualOvertimeAdjustmentInput = document.getElementById('manualOvertimeAdjustment');
+        const adjustOvertimeButton = document.getElementById('adjustOvertimeButton');
+        const toggleManualAdjustmentButton = document.getElementById('toggleManualAdjustmentButton'); // 新しいトグルボタン
+        const manualAdjustmentSection = document.getElementById('manualAdjustmentSection'); // 手動修正セクション
+        const toggleArrow = document.getElementById('toggleArrow'); // トグル矢印
 
         // 定数定義
         const STANDARD_END_TIME_MINUTES = 18 * 60 + 30; // 18:30 を分に変換 (1110分)
@@ -136,7 +162,6 @@
                 accumulatedOvertimeMinutes = 0;
                 saveToLocalStorage(LOCAL_STORAGE_KEY_ACCUMULATED_OVERTIME, accumulatedOvertimeMinutes);
                 saveToLocalStorage(LOCAL_STORAGE_KEY_LAST_MONTH, currentMonthYYMM);
-                // 月が変わったので、日次記録もクリアしても良いが、今回は累計のみリセット
                 localStorage.removeItem(LOCAL_STORAGE_KEY_DAILY_RECORDS); // 月替わりで日次記録もクリア
             }
 
@@ -293,6 +318,8 @@
             return null; // どの形式にも一致しない場合
         }
 
+        // --- イベントリスナー ---
+
         /**
          * 累計残業時間修正ボタンクリック時の処理
          */
@@ -420,6 +447,22 @@
                 } finally {
                     document.body.removeChild(textArea);
                 }
+            }
+        });
+
+        /**
+         * 手動修正セクションのトグル処理
+         */
+        toggleManualAdjustmentButton.addEventListener('click', () => {
+            const isExpanded = toggleManualAdjustmentButton.getAttribute('aria-expanded') === 'true';
+            if (isExpanded) {
+                manualAdjustmentSection.classList.remove('open');
+                toggleManualAdjustmentButton.setAttribute('aria-expanded', 'false');
+                toggleArrow.style.transform = 'rotate(0deg)';
+            } else {
+                manualAdjustmentSection.classList.add('open');
+                toggleManualAdjustmentButton.setAttribute('aria-expanded', 'true');
+                toggleArrow.style.transform = 'rotate(180deg)';
             }
         });
     </script>
